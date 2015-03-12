@@ -11,19 +11,19 @@ import (
 )
 
 type acConfig struct {
-	chcoredone chan bool
-	chhints    chan assetHint
-	chcore     chan assetHint
-	esHost     string
-	maxHits    int
-	window     time.Duration
+	chhints      chan assetHint
+	chcore       chan bool
+	chcoreworker chan bool
+	esHost       string
+	maxHits      int
+	window       time.Duration
 }
 
 func (cfg *acConfig) setDefaults() {
 	cfg.esHost = "eshost"
-	cfg.maxHits = 10
+	cfg.maxHits = 50
 	cfg.window = time.Hour * 8
 	cfg.chhints = make(chan assetHint)
-	cfg.chcore = make(chan assetHint)
-	cfg.chcoredone = make(chan bool)
+	cfg.chcore = make(chan bool)
+	cfg.chcoreworker = make(chan bool)
 }

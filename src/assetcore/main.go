@@ -8,12 +8,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/mattbaird/elastigo/api"
 	"github.com/mattbaird/elastigo/search"
 	"strconv"
 	"time"
 )
+
+var assetBlock []asset
 
 var cfg acConfig
 
@@ -59,16 +60,46 @@ func pullHints() {
 	close(cfg.chhints)
 }
 
+func processAssetHint(hint assetHint) {
+	rulesPipeline(hint)
+}
+
+func assetCorWorker(hintbuf []assetHint) {
+	for _, x := range hintbuf {
+		processAssetHint(x)
+	}
+	cfg.chcoreworker <- true
+}
+
 func assetCorrelator() {
+	var hintBuffer []assetHint = nil
+	wrkcnt := 0
 	for {
-		newhint, status := <-cfg.chcore
+		if hintBuffer == nil {
+			hintBuffer = make([]assetHint, 0, 250)
+		}
+		newhint, status := <-cfg.chhints
 		if !status {
 			break
 		}
-		fmt.Println(newhint)
+		hintBuffer = append(hintBuffer, newhint)
+		if len(hintBuffer) == cap(hintBuffer) {
+			wrkcnt += 1
+			go assetCorWorker(hintBuffer)
+			hintBuffer = nil
+		}
+	}
+	if len(hintBuffer) > 0 {
+		wrkcnt += 1
+		go assetCorWorker(hintBuffer)
 	}
 
-	cfg.chcoredone <- true
+	for wrkcnt > 0 {
+		<-cfg.chcoreworker
+		wrkcnt -= 1
+	}
+
+	cfg.chcore <- true
 }
 
 func main() {
@@ -76,34 +107,7 @@ func main() {
 
 	esSetup()
 
-	workersdone := false
-	correlatordone := false
 	go pullHints()
 	go assetCorrelator()
-	for {
-		if !workersdone {
-			select {
-			case newhint, status := <-cfg.chhints:
-				if !status {
-					workersdone = true
-					close(cfg.chcore)
-				} else {
-					cfg.chcore <- newhint
-				}
-			default:
-				break
-			}
-		}
-
-		select {
-		case <-cfg.chcoredone:
-			correlatordone = true
-		default:
-			break
-		}
-
-		if workersdone && correlatordone {
-			break
-		}
-	}
+	<-cfg.chcore
 }
