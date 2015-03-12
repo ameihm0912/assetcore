@@ -25,6 +25,7 @@ func esSetup() {
 func pullHintsWorker(start time.Time, end time.Time) {
 	qs := start.Format(time.RFC3339)
 	qe := end.Format(time.RFC3339)
+	logmsg("new hints worker %v -> %v", qs, qe)
 	res, err := search.Search("events").Size(strconv.Itoa(cfg.maxHits)).Filter(
 		search.Filter().Terms("category", "asset_hint"),
 		search.Range().Field("utctimestamp").From(qs).To(qe),
@@ -49,6 +50,7 @@ func pullHints() {
 	end := time.Now().UTC()
 	start := end.Add(-1 * cfg.window)
 
+	logmsg("hints fetch started")
 	index_s := start
 	index_e := start.Add(time.Hour)
 	for index_s.Before(end) {
@@ -57,6 +59,7 @@ func pullHints() {
 		index_e = index_e.Add(time.Hour)
 	}
 
+	logmsg("hints fetch complete")
 	close(cfg.chhints)
 }
 
@@ -73,6 +76,7 @@ func assetCorWorker(hintbuf []assetHint) {
 
 func assetCorrelator() {
 	var hintBuffer []assetHint = nil
+	logmsg("asset correlator started")
 	wrkcnt := 0
 	for {
 		if hintBuffer == nil {
@@ -99,15 +103,23 @@ func assetCorrelator() {
 		wrkcnt -= 1
 	}
 
+	logmsg("asset correlator exiting")
 	cfg.chcore <- true
 }
 
 func main() {
 	cfg.setDefaults()
 
+	go logger()
+	logmsg("assetcore initializing")
 	esSetup()
 
 	go pullHints()
 	go assetCorrelator()
+
 	<-cfg.chcore
+	logmsg("assetcore exiting")
+	close(cfg.chlogger)
+	// Wait for the logger routine to exit so we get any last notifications.
+	<-cfg.chloggerexit
 }

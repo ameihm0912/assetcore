@@ -14,6 +14,8 @@ type acConfig struct {
 	chhints      chan assetHint
 	chcore       chan bool
 	chcoreworker chan bool
+	chlogger     chan string
+	chloggerexit chan bool
 	esHost       string
 	maxHits      int
 	window       time.Duration
@@ -26,4 +28,6 @@ func (cfg *acConfig) setDefaults() {
 	cfg.chhints = make(chan assetHint)
 	cfg.chcore = make(chan bool)
 	cfg.chcoreworker = make(chan bool)
+	cfg.chlogger = make(chan string)
+	cfg.chloggerexit = make(chan bool)
 }
