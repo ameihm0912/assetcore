@@ -47,12 +47,15 @@ type asset struct {
 	// Asset UUID
 	AssetID string `json:"assetid"`
 
+	// Fold source information
+	Fold foldSource `json:"fold,omitempty"`
+
 	// Hostnames known to be assigned to this device.
 	Hostname []string `json:"hostname,omitempty"`
 
 	// Addresses known to be assigned to this device.
 	IPv4 []string `json:"ipv4,omitempty"`
-	IPv6 []string `json:"ipv6,omiempty"`
+	IPv6 []string `json:"ipv6,omitempty"`
 
 	// MAC addresses known to be associated with this device.
 	MAC []string `json:"macaddress,omitempty"`
@@ -62,6 +65,34 @@ type asset struct {
 
 	IsNew bool `json:"-"`
 	sync.Mutex
+}
+
+type foldSource struct {
+	Tags []foldTag `json:"tags,omitempty"`
+}
+
+type foldTag struct {
+	Name     string    `json:"name"`
+	Provided time.Time `json:"provided"`
+}
+
+func (a *asset) updateHintTags(hint *assetHint) {
+	var foundidx int
+	for _, x := range hint.Tags {
+		foundidx = -1
+		for i, y := range a.Fold.Tags {
+			if x == y.Name {
+				foundidx = i
+				break
+			}
+		}
+		if foundidx != -1 {
+			a.Fold.Tags[foundidx].Provided = hint.Timestamp
+		} else {
+			newtag := foldTag{x, hint.Timestamp}
+			a.Fold.Tags = append(a.Fold.Tags, newtag)
+		}
+	}
 }
 
 func (a *asset) testIPv4Related(hint *assetHint, l []*asset) []*asset {

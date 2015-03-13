@@ -26,6 +26,7 @@ func createNewAssetFromHint(hint assetHint) {
 			a.IPv4 = append(a.IPv4, x)
 		}
 	}
+	a.updateHintTags(&hint)
 	a.LastUpdated = time.Now().UTC()
 	a.IsNew = true
 	aBlock.addAsset(a)

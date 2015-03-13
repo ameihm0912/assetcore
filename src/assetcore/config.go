@@ -26,8 +26,8 @@ type acConfig struct {
 func (cfg *acConfig) setDefaults() {
 	cfg.assetIndex = "assets"
 	cfg.esHost = "eshost"
-	cfg.maxAssetHits = 500
-	cfg.maxHits = 50
+	cfg.maxAssetHits = 1000
+	cfg.maxHits = 25
 	cfg.window = time.Hour * 8
 	cfg.chhints = make(chan assetHint)
 	cfg.chcore = make(chan bool)

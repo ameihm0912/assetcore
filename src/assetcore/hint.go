@@ -18,6 +18,7 @@ type assetHint struct {
 	Pid       string    `json:"processid"`
 	ProcName  string    `json:"processname"`
 	Summary   string    `json:"summary"`
+	Tags      []string  `json:"tags"`
 	Timestamp time.Time `json:"utctimestamp"`
 	Details   assetHintDetails
 }
@@ -29,6 +30,10 @@ type assetHintDetails struct {
 	NexAssetId string   `json:"nexassetid"`
 	MAC        []string `json:"macaddress"`
 	Software   []string `json:"software"`
+
+	// Some compatability for the way MIG sends hint data, we should
+	// standardize on fields later.
+	HostnameMig string `json:"name"`
 }
 
 func (h *assetHint) sanitize() {
@@ -40,5 +45,9 @@ func (h *assetHint) sanitize() {
 		if r != -1 {
 			h.Details.IPv4[i] = x[:r]
 		}
+	}
+
+	if len(h.Details.HostnameMig) != 0 {
+		h.Details.Hostname = h.Details.HostnameMig
 	}
 }
