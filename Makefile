@@ -3,26 +3,16 @@ PROJ = assetcore
 
 all: $(PROJ)
 
-predeps:
+depends:
 	go get github.com/bitly/go-hostpool
 	go get github.com/araddon/gou
 	go get code.google.com/p/go-uuid/uuid
-
-depends: predeps setup-elastigo build-elastigo
-
-build-elastigo:
-	go install github.com/mattbaird/elastigo
-
-setup-elastigo:
-	mkdir -p src/github.com/mattbaird
-	git clone https://github.com/mattbaird/elastigo.git \
-		src/github.com/mattbaird/elastigo
-	(cd src/github.com/mattbaird/elastigo && \
-		git checkout tags/v1.0)
+	go get github.com/mattbaird/elastigo
 
 cleanall:
 	rm -rf pkg
 	rm -rf src/github.com
+	rm -rf src/code.google.com
 	rm -rf bin/*
 
 clean:

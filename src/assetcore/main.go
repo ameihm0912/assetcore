@@ -8,28 +8,45 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/mattbaird/elastigo/api"
-	"github.com/mattbaird/elastigo/core"
-	"github.com/mattbaird/elastigo/search"
-	"strconv"
+	"fmt"
+	elastigo "github.com/mattbaird/elastigo/lib"
 	"time"
 )
+
+var es *elastigo.Conn
 
 var aBlock assetBlock
 var cfg acConfig
 
 func esSetup() {
-	api.Domain = cfg.esHost
+	es = elastigo.NewConn()
+	es.Domain = cfg.esHost
 }
 
 func pullHintsWorker(start time.Time, end time.Time) {
 	qs := start.Format(time.RFC3339)
 	qe := end.Format(time.RFC3339)
 	logmsg("new hints worker %v -> %v", qs, qe)
-	res, err := search.Search("events").Size(strconv.Itoa(cfg.maxHits)).Filter(
-		search.Filter().Terms("category", "asset_hint"),
-		search.Range().Field("utctimestamp").From(qs).To(qe),
-	).Result()
+
+	template := `{
+		"size": %v,
+		"query": {
+			"term": {
+				category: "asset_hint"
+			}
+		},
+		"filter": {
+			"range": {
+				"utctimestamp": {
+					"from": "%v",
+					"to": "%v"
+				}
+			}
+		}
+	}`
+	sj := fmt.Sprintf(template, cfg.maxHits, qs, qe)
+
+	res, err := es.Search("events", "event", nil, sj)
 	if err != nil {
 		logmsg("error fetching hints: %v", err)
 		return
@@ -54,17 +71,6 @@ func pullHintsWorker(start time.Time, end time.Time) {
 
 func pushAssets() {
 	aBlock.Lock()
-	for _, x := range aBlock.assets {
-		buf, err := json.Marshal(x)
-		if err != nil {
-			logmsg("error marshalling asset: %v", err)
-			continue
-		}
-		_, err = core.Index(cfg.assetIndex, "asset", x.AssetID, nil, buf)
-		if err != nil {
-			logmsg("error indexing asset: %+v", err)
-		}
-	}
 	aBlock.Unlock()
 }
 
