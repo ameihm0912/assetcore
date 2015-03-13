@@ -27,6 +27,7 @@ func createNewAssetFromHint(hint assetHint) {
 		}
 	}
 	a.LastUpdated = time.Now().UTC()
+	a.IsNew = true
 	aBlock.addAsset(a)
 }
 

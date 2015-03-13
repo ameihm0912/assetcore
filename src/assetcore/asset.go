@@ -12,8 +12,10 @@ import (
 )
 
 type assetBlock struct {
-	assets []asset
-	count  int
+	assets       []asset
+	count        int
+	newcount     int
+	existedcount int
 
 	// Search lock.
 	sync.Mutex
@@ -23,6 +25,9 @@ func (a *assetBlock) addAsset(newasset asset) {
 	a.Lock()
 	a.assets = append(a.assets, newasset)
 	a.count += 1
+	if newasset.IsNew {
+		a.newcount += 1
+	}
 	a.Unlock()
 }
 
@@ -55,6 +60,7 @@ type asset struct {
 	// The last time this object was updated.
 	LastUpdated time.Time `json:"lastupdated"`
 
+	IsNew bool `json:"-"`
 	sync.Mutex
 }
 

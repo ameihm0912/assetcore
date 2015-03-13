@@ -79,10 +79,19 @@ func pullAssets() error {
 	}`
 	sj := fmt.Sprintf(template, cfg.maxAssetHits)
 
+	haveidx, err := es.IndicesExists("assets")
+	if err != nil {
+		logmsg("error obtaining index status: %v", err)
+		return err
+	}
+	if !haveidx {
+		return nil
+	}
+
 	res, err := es.Search("assets", "asset", nil, sj)
 	if err != nil {
 		logmsg("error fetching assets: %v", err)
-		return errors.New("error fetching assets")
+		return err
 	}
 	if res.Hits.Total == 0 {
 		return nil
@@ -93,16 +102,16 @@ func pullAssets() error {
 		return errors.New("fetched incomplete asset list")
 	}
 	logmsg("fetched %v assets", haveassets)
-	aBlock.Lock()
 	for _, x := range res.Hits.Hits {
 		var a asset
 		err = json.Unmarshal(*x.Source, &a)
 		if err != nil {
 			logmsg("error unmarshalling asset: %v", err)
-			return errors.New("error unmarshalling asset")
+			return err
 		}
+		aBlock.addAsset(a)
+		aBlock.existedcount += 1
 	}
-	aBlock.Unlock()
 	logmsg("assets inserted into asset block")
 	return nil
 }
@@ -183,9 +192,11 @@ func assetCorrelator() {
 	}
 
 	logmsg("correlation complete, %v assets in block", aBlock.count)
+	logmsg("%v assets existed before run", aBlock.existedcount)
+	logmsg("%v assets are new", aBlock.newcount)
 
 	logmsg("pushing updated asset data")
-	//pushAssets()
+	pushAssets()
 
 	logmsg("asset correlator exiting")
 	cfg.chcore <- true
