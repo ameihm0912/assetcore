@@ -43,14 +43,14 @@ type asset struct {
 	AssetID string `json:"assetid"`
 
 	// Hostnames known to be assigned to this device.
-	Hostname []string `json:"hostname"`
+	Hostname []string `json:"hostname,omitempty"`
 
 	// Addresses known to be assigned to this device.
-	IPv4 []string `json:"ipv4"`
-	IPv6 []string `json:"ipv6"`
+	IPv4 []string `json:"ipv4,omitempty"`
+	IPv6 []string `json:"ipv6,omiempty"`
 
 	// MAC addresses known to be associated with this device.
-	MAC []string `json:"macaddress"`
+	MAC []string `json:"macaddress,omitempty"`
 
 	// The last time this object was updated.
 	LastUpdated time.Time `json:"lastupdated"`

@@ -8,8 +8,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	elastigo "github.com/mattbaird/elastigo/lib"
+	"os"
 	"time"
 )
 
@@ -69,6 +71,42 @@ func pullHintsWorker(start time.Time, end time.Time) {
 	}
 }
 
+func pullAssets() error {
+	logmsg("initializing asset block from es")
+
+	template := `{
+		"size": %v
+	}`
+	sj := fmt.Sprintf(template, cfg.maxAssetHits)
+
+	res, err := es.Search("assets", "asset", nil, sj)
+	if err != nil {
+		logmsg("error fetching assets: %v", err)
+		return errors.New("error fetching assets")
+	}
+	if res.Hits.Total == 0 {
+		return nil
+	}
+	haveassets := res.Hits.Len()
+	if haveassets < res.Hits.Total {
+		logmsg("error: incomplete asset list, will not continue (got %v of %v)", haveassets, res.Hits.Total)
+		return errors.New("fetched incomplete asset list")
+	}
+	logmsg("fetched %v assets", haveassets)
+	aBlock.Lock()
+	for _, x := range res.Hits.Hits {
+		var a asset
+		err = json.Unmarshal(*x.Source, &a)
+		if err != nil {
+			logmsg("error unmarshalling asset: %v", err)
+			return errors.New("error unmarshalling asset")
+		}
+	}
+	aBlock.Unlock()
+	logmsg("assets inserted into asset block")
+	return nil
+}
+
 func pushAssets() {
 	aBlock.Lock()
 	for _, x := range aBlock.assets {
@@ -126,6 +164,7 @@ func assetCorrelator() {
 		if !status {
 			break
 		}
+		newhint.sanitize()
 		hintBuffer = append(hintBuffer, newhint)
 		if len(hintBuffer) == cap(hintBuffer) {
 			wrkcnt += 1
@@ -146,10 +185,16 @@ func assetCorrelator() {
 	logmsg("correlation complete, %v assets in block", aBlock.count)
 
 	logmsg("pushing updated asset data")
-	pushAssets()
+	//pushAssets()
 
 	logmsg("asset correlator exiting")
 	cfg.chcore <- true
+}
+
+func doexit(rc int) {
+	close(cfg.chlogger)
+	<-cfg.chloggerexit
+	os.Exit(rc)
 }
 
 func main() {
@@ -159,12 +204,15 @@ func main() {
 	logmsg("assetcore initializing")
 	esSetup()
 
+	err := pullAssets()
+	if err != nil {
+		doexit(1)
+	}
+
 	go pullHints()
 	go assetCorrelator()
 
 	<-cfg.chcore
 	logmsg("assetcore exiting")
-	close(cfg.chlogger)
-	// Wait for the logger routine to exit so we get any last notifications.
-	<-cfg.chloggerexit
+	doexit(0)
 }

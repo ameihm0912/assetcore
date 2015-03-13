@@ -18,6 +18,7 @@ type acConfig struct {
 	chloggerexit chan bool
 	assetIndex   string
 	esHost       string
+	maxAssetHits int
 	maxHits      int
 	window       time.Duration
 }
@@ -25,6 +26,7 @@ type acConfig struct {
 func (cfg *acConfig) setDefaults() {
 	cfg.assetIndex = "assets"
 	cfg.esHost = "eshost"
+	cfg.maxAssetHits = 500
 	cfg.maxHits = 50
 	cfg.window = time.Hour * 8
 	cfg.chhints = make(chan assetHint)
