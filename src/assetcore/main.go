@@ -71,6 +71,17 @@ func pullHintsWorker(start time.Time, end time.Time) {
 
 func pushAssets() {
 	aBlock.Lock()
+	for _, x := range aBlock.assets {
+		buf, err := json.Marshal(x)
+		if err != nil {
+			logmsg("error marshalling asset: %v", err)
+			continue
+		}
+		_, err = es.Index(cfg.assetIndex, "asset", x.AssetID, nil, buf)
+		if err != nil {
+			logmsg("error indexing asset: %v", err)
+		}
+	}
 	aBlock.Unlock()
 }
 
