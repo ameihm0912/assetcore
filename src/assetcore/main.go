@@ -14,8 +14,7 @@ import (
 	"time"
 )
 
-var assetBlock []asset
-
+var aBlock assetBlock
 var cfg acConfig
 
 func esSetup() {
@@ -31,11 +30,17 @@ func pullHintsWorker(start time.Time, end time.Time) {
 		search.Range().Field("utctimestamp").From(qs).To(qe),
 	).Result()
 	if err != nil {
+		logmsg("error fetching hints: %v", err)
 		return
 	}
 	if res.Hits.Total == 0 {
 		return
 	}
+	havehints := res.Hits.Len()
+	if havehints < res.Hits.Total {
+		logmsg("WARNING: some hints not returned, increase maxHits (got %v of %v)", havehints, res.Hits.Total)
+	}
+	logmsg("hints worker sending %v hits", res.Hits.Len())
 	for _, x := range res.Hits.Hits {
 		var h assetHint
 		err = json.Unmarshal(*x.Source, &h)
@@ -68,6 +73,7 @@ func processAssetHint(hint assetHint) {
 }
 
 func assetCorWorker(hintbuf []assetHint) {
+	logmsg("new correlation worker processing %v hints", len(hintbuf))
 	for _, x := range hintbuf {
 		processAssetHint(x)
 	}
@@ -102,6 +108,8 @@ func assetCorrelator() {
 		<-cfg.chcoreworker
 		wrkcnt -= 1
 	}
+
+	logmsg("correlation complete, %v assets in block", aBlock.count)
 
 	logmsg("asset correlator exiting")
 	cfg.chcore <- true
