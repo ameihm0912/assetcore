@@ -27,7 +27,7 @@ func (cfg *acConfig) setDefaults() {
 	cfg.assetIndex = "assets"
 	cfg.esHost = "eshost"
 	cfg.maxAssetHits = 10000
-	cfg.maxHits = 5000
+	cfg.maxHits = 10000
 	cfg.window = time.Hour * 8
 	cfg.chhints = make(chan assetHint)
 	cfg.chcore = make(chan bool)
