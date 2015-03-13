@@ -39,6 +39,9 @@ func (a *assetBlock) searchRelatedAssets(hint *assetHint) (ret []*asset) {
 }
 
 type asset struct {
+	// Asset UUID
+	AssetID string `json:"assetid"`
+
 	// Hostnames known to be assigned to this device.
 	Hostname []string `json:"hostname"`
 

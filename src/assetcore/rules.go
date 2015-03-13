@@ -7,6 +7,7 @@
 package main
 
 import (
+	"code.google.com/p/go-uuid/uuid"
 	"time"
 )
 
@@ -16,6 +17,7 @@ func relatedAssets(hint assetHint) []*asset {
 
 func createNewAssetFromHint(hint assetHint) {
 	var a asset
+	a.AssetID = uuid.NewRandom().String()
 	if len(hint.Details.Hostname) > 0 {
 		a.Hostname = append(a.Hostname, hint.Details.Hostname)
 	}

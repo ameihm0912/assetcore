@@ -9,6 +9,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/mattbaird/elastigo/api"
+	"github.com/mattbaird/elastigo/core"
 	"github.com/mattbaird/elastigo/search"
 	"strconv"
 	"time"
@@ -49,6 +50,22 @@ func pullHintsWorker(start time.Time, end time.Time) {
 		}
 		cfg.chhints <- h
 	}
+}
+
+func pushAssets() {
+	aBlock.Lock()
+	for _, x := range aBlock.assets {
+		buf, err := json.Marshal(x)
+		if err != nil {
+			logmsg("error marshalling asset: %v", err)
+			continue
+		}
+		_, err = core.Index(cfg.assetIndex, "asset", x.AssetID, nil, buf)
+		if err != nil {
+			logmsg("error indexing asset: %+v", err)
+		}
+	}
+	aBlock.Unlock()
 }
 
 func pullHints() {
@@ -110,6 +127,9 @@ func assetCorrelator() {
 	}
 
 	logmsg("correlation complete, %v assets in block", aBlock.count)
+
+	logmsg("pushing updated asset data")
+	pushAssets()
 
 	logmsg("asset correlator exiting")
 	cfg.chcore <- true

@@ -6,6 +6,7 @@ all: $(PROJ)
 predeps:
 	go get github.com/bitly/go-hostpool
 	go get github.com/araddon/gou
+	go get code.google.com/p/go-uuid/uuid
 
 depends: predeps setup-elastigo build-elastigo
 
