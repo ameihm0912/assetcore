@@ -278,7 +278,7 @@ func assetCorrelator() {
 	wrkcnt := 0
 	for {
 		if hintBuffer == nil {
-			hintBuffer = make([]assetHint, 0, 250)
+			hintBuffer = make([]assetHint, 0, 2000)
 		}
 		newhint, status := <-cfg.chhints
 		if !status {
@@ -305,6 +305,7 @@ func assetCorrelator() {
 	logmsg("correlation complete, %v assets in block", aBlock.count)
 	logmsg("%v assets existed before run", aBlock.existedcount)
 	logmsg("%v assets are new", aBlock.newcount)
+	logmsg("%v hints ignored due to expired tag timestamps", corCntrs.hints_ignored_tagts)
 
 	logmsg("pushing updated asset data")
 	pushAssets()

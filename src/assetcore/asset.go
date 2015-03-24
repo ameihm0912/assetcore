@@ -21,6 +21,15 @@ type assetBlock struct {
 	sync.Mutex
 }
 
+// Some additional counters used during correlation operations that are
+// not directly related to the asset block.
+type correlationCounters struct {
+	hints_ignored_tagts int
+	sync.Mutex
+}
+
+var corCntrs correlationCounters
+
 func (a *assetBlock) addAsset(newasset asset) {
 	a.Lock()
 	a.assets = append(a.assets, newasset)
@@ -35,8 +44,14 @@ func (a *assetBlock) searchRelatedAssets(hint *assetHint) (ret []*asset) {
 	a.Lock()
 	for _, x := range a.assets {
 		x.Lock()
-		ret = x.testIPv4Related(hint, ret)
-		ret = x.testHostnameRelated(hint, ret)
+		ret, added := x.testIPv4Related(hint, ret)
+		if added {
+			continue
+		}
+		ret, added = x.testHostnameRelated(hint, ret)
+		if added {
+			continue
+		}
 		x.Unlock()
 	}
 	a.Unlock()
@@ -95,24 +110,61 @@ func (a *asset) updateHintTags(hint *assetHint) {
 	}
 }
 
-func (a *asset) testIPv4Related(hint *assetHint, l []*asset) []*asset {
+func (a *asset) tagExpired(hint *assetHint) bool {
+	ts := hint.Timestamp
+	for _, x := range a.Fold.Tags {
+		// Don't compare the asset tag here, this is present in all
+		// hint events, and should always be set to the timestamp
+		// provided be the newest hint for the asset.
+		if x.Name == "asset" {
+			continue
+		}
+		for _, y := range hint.Tags {
+			if x.Name == y {
+				if x.Provided.After(ts) {
+					return true
+				} else {
+					// The tag existed in both the hint and
+					// the asset, but the hint is newer so
+					// we will want to integrate it.
+					return false
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (a *asset) updateFromHint(hint *assetHint) {
+	// See if the asset already has data integrated from a hint from
+	// the same provider that is newer; if so this older hint is just
+	// ignored.
+	if a.tagExpired(hint) {
+		corCntrs.Lock()
+		corCntrs.hints_ignored_tagts++
+		corCntrs.Unlock()
+		return
+	}
+}
+
+func (a *asset) testIPv4Related(hint *assetHint, l []*asset) ([]*asset, bool) {
 	for _, x := range a.IPv4 {
 		for _, y := range hint.Details.IPv4 {
 			if x == y {
 				l = append(l, a)
-				return l
+				return l, true
 			}
 		}
 	}
-	return l
+	return l, false
 }
 
-func (a *asset) testHostnameRelated(hint *assetHint, l []*asset) []*asset {
+func (a *asset) testHostnameRelated(hint *assetHint, l []*asset) ([]*asset, bool) {
 	for _, x := range a.Hostname {
 		if hint.Details.Hostname == x {
 			l = append(l, a)
-			return l
+			return l, true
 		}
 	}
-	return l
+	return l, false
 }
