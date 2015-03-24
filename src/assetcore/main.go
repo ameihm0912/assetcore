@@ -17,19 +17,28 @@ import (
 )
 
 var es *elastigo.Conn
+var esxh []*elastigo.Conn
 
 var aBlock assetBlock
 var cfg acConfig
 
 func esSetup() {
+	logmsg("create connection entry for %v", cfg.esHost)
 	es = elastigo.NewConn()
 	es.Domain = cfg.esHost
+
+	for _, x := range cfg.esExHintsHosts {
+		logmsg("create connection entry for %v", x)
+		newes := elastigo.NewConn()
+		newes.Domain = x
+		esxh = append(esxh, newes)
+	}
 }
 
-func pullHintsWorker(start time.Time, end time.Time, cchan chan assetHint) {
+func pullHintsWorker(start time.Time, end time.Time, cchan chan assetHint, esconn *elastigo.Conn) {
 	qs := start.Format(time.RFC3339)
 	qe := end.Format(time.RFC3339)
-	logmsg("new hints worker %v -> %v", qs, qe)
+	logmsg("new hints worker (%v) %v -> %v", esconn.Domain, qs, qe)
 
 	template := `{
 		"size": %v,
@@ -49,7 +58,7 @@ func pullHintsWorker(start time.Time, end time.Time, cchan chan assetHint) {
 	}`
 	sj := fmt.Sprintf(template, cfg.maxHits, qs, qe)
 
-	res, err := es.Search("events", "event", nil, sj)
+	res, err := esconn.Search("events", "event", nil, sj)
 	if err != nil {
 		logmsg("error fetching hints: %v", err)
 		return
@@ -231,7 +240,14 @@ func pullHints() {
 	index_s := start
 	index_e := start.Add(time.Hour)
 	for index_s.Before(end) {
-		pullHintsWorker(index_s, index_e, cchan)
+		pullHintsWorker(index_s, index_e, cchan, es)
+
+		// If extra hint sources have been defined, query these within
+		// the same time range as well.
+		for _, x := range esxh {
+			pullHintsWorker(index_s, index_e, cchan, x)
+		}
+
 		index_s = index_s.Add(time.Hour)
 		index_e = index_e.Add(time.Hour)
 	}

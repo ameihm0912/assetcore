@@ -17,11 +17,12 @@ type acConfig struct {
 	chlogger     chan string
 	chloggerexit chan bool
 
-	assetIndex   string
-	esHost       string
-	maxAssetHits int
-	maxHits      int
-	window       time.Duration
+	assetIndex     string
+	esHost         string
+	esExHintsHosts []string
+	maxAssetHits   int
+	maxHits        int
+	window         time.Duration
 
 	dataCache           bool
 	cacheAssetsPrePath  string
@@ -32,6 +33,7 @@ type acConfig struct {
 func (cfg *acConfig) setDefaults() {
 	cfg.assetIndex = "assets"
 	cfg.esHost = "eshost"
+	cfg.esExHintsHosts = []string{"eshost2"}
 	cfg.maxAssetHits = 10000
 	cfg.maxHits = 10000
 	cfg.window = time.Hour * 8
