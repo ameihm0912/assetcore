@@ -16,11 +16,17 @@ type acConfig struct {
 	chcoreworker chan bool
 	chlogger     chan string
 	chloggerexit chan bool
+
 	assetIndex   string
 	esHost       string
 	maxAssetHits int
 	maxHits      int
 	window       time.Duration
+
+	dataCache           bool
+	cacheAssetsPrePath  string
+	cacheAssetsPostPath string
+	cacheHintsPath      string
 }
 
 func (cfg *acConfig) setDefaults() {
@@ -29,6 +35,12 @@ func (cfg *acConfig) setDefaults() {
 	cfg.maxAssetHits = 10000
 	cfg.maxHits = 10000
 	cfg.window = time.Hour * 8
+
+	cfg.dataCache = false
+	cfg.cacheAssetsPrePath = "./assets-pre.acc"
+	cfg.cacheAssetsPostPath = "./assets-post.acc"
+	cfg.cacheHintsPath = "./hints.acc"
+
 	cfg.chhints = make(chan assetHint)
 	cfg.chcore = make(chan bool)
 	cfg.chcoreworker = make(chan bool)

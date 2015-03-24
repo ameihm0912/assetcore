@@ -9,6 +9,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"os"
@@ -25,7 +26,7 @@ func esSetup() {
 	es.Domain = cfg.esHost
 }
 
-func pullHintsWorker(start time.Time, end time.Time) {
+func pullHintsWorker(start time.Time, end time.Time, cchan chan assetHint) {
 	qs := start.Format(time.RFC3339)
 	qe := end.Format(time.RFC3339)
 	logmsg("new hints worker %v -> %v", qs, qe)
@@ -68,16 +69,42 @@ func pullHintsWorker(start time.Time, end time.Time) {
 			continue
 		}
 		cfg.chhints <- h
+
+		// If the cache channel is not nil, that means we are in active
+		// cacheing mode. Also send the hint to the hint cache
+		// goroutine so it can be written to disk.
+		if cchan != nil {
+			cchan <- h
+		}
 	}
 }
 
 func pullAssets() error {
-	logmsg("initializing asset block from es")
-
 	template := `{
 		"size": %v
 	}`
 	sj := fmt.Sprintf(template, cfg.maxAssetHits)
+
+	if cfg.dataCache {
+		logmsg("initializing asset block from cache")
+		adata, err := cache_get_assets_pre()
+		if err != nil {
+			logmsg("error reading cached assets: %v", err)
+			return err
+		}
+		if len(adata) > 0 {
+			// If cached data was returned from the cache, use that
+			// instead of an ES query.
+			for _, x := range adata {
+				aBlock.addAsset(x)
+				aBlock.existedcount += 1
+			}
+			return nil
+		}
+		logmsg("no cached assets, will populate this time")
+	}
+
+	logmsg("initializing asset block from es")
 
 	haveidx, err := es.IndicesExists("assets")
 	if err != nil {
@@ -113,11 +140,39 @@ func pullAssets() error {
 		aBlock.existedcount += 1
 	}
 	logmsg("assets inserted into asset block")
+
+	if cfg.dataCache {
+		logmsg("writing asset pre cache")
+		for _, x := range aBlock.assets {
+			err = cache_asset(x, true)
+			if err != nil {
+				logmsg("error cacheing asset: %v", err)
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
 func pushAssets() {
 	aBlock.Lock()
+	defer func() {
+		aBlock.Unlock()
+	}()
+
+	if cfg.dataCache {
+		logmsg("writing post asset cache")
+		for _, x := range aBlock.assets {
+			err := cache_asset(x, false)
+			if err != nil {
+				logmsg("error caching post assets: %v", err)
+				return
+			}
+		}
+		return
+	}
+
 	for _, x := range aBlock.assets {
 		buf, err := json.Marshal(x)
 		if err != nil {
@@ -129,23 +184,63 @@ func pushAssets() {
 			logmsg("error indexing asset: %v", err)
 		}
 	}
-	aBlock.Unlock()
 }
 
 func pullHints() {
 	end := time.Now().UTC()
 	start := end.Add(-1 * cfg.window)
 
+	var cchan chan assetHint
+	var cchandone chan bool
+
+	if cfg.dataCache {
+		logmsg("initializing hints from cache")
+		hdata, err := cache_get_hints()
+		if err != nil {
+			logmsg("error reading cached hints: %v", err)
+			doexit(1)
+		}
+		if len(hdata) > 0 {
+			for _, x := range hdata {
+				cfg.chhints <- x
+			}
+			close(cfg.chhints)
+			return
+		}
+		logmsg("no cached hints, will populate this time")
+
+		cchan = make(chan assetHint)
+		cchandone = make(chan bool)
+		go func() {
+			for {
+				h, ok := <-cchan
+				if !ok {
+					break
+				}
+				err = cache_hint(h)
+				if err != nil {
+					logmsg("error cacheing hint: %v", err)
+					doexit(1)
+				}
+			}
+			cchandone <- true
+		}()
+	}
+
 	logmsg("hints fetch started")
 	index_s := start
 	index_e := start.Add(time.Hour)
 	for index_s.Before(end) {
-		pullHintsWorker(index_s, index_e)
+		pullHintsWorker(index_s, index_e, cchan)
 		index_s = index_s.Add(time.Hour)
 		index_e = index_e.Add(time.Hour)
 	}
 
 	logmsg("hints fetch complete")
+	if cchan != nil {
+		close(cchan)
+		<-cchandone
+	}
 	close(cfg.chhints)
 }
 
@@ -203,6 +298,7 @@ func assetCorrelator() {
 }
 
 func doexit(rc int) {
+	cache_close()
 	close(cfg.chlogger)
 	<-cfg.chloggerexit
 	os.Exit(rc)
@@ -210,10 +306,21 @@ func doexit(rc int) {
 
 func main() {
 	cfg.setDefaults()
+	flag.BoolVar(&cfg.dataCache, "c", false, "Enable offline data cache")
+	flag.Parse()
 
 	go logger()
 	logmsg("assetcore initializing")
 	esSetup()
+
+	if cfg.dataCache {
+		logmsg("initializing data cache")
+		err := cache_init()
+		if err != nil {
+			logmsg("error initializing cache: %v", err)
+			doexit(1)
+		}
+	}
 
 	err := pullAssets()
 	if err != nil {
