@@ -106,7 +106,6 @@ func pullAssets() error {
 			// instead of an ES query.
 			for _, x := range adata {
 				aBlock.addAsset(x)
-				aBlock.existedcount += 1
 			}
 			return nil
 		}
@@ -146,7 +145,6 @@ func pullAssets() error {
 			return err
 		}
 		aBlock.addAsset(a)
-		aBlock.existedcount += 1
 	}
 	logmsg("assets inserted into asset block")
 
@@ -316,7 +314,10 @@ func assetCorrelator() {
 }
 
 func doexit(rc int) {
-	cache_close()
+	err := cache_close()
+	if err != nil {
+		logmsg("warning: cache close failed: %v", err)
+	}
 	close(cfg.chlogger)
 	<-cfg.chloggerexit
 	os.Exit(rc)

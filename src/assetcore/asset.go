@@ -37,6 +37,8 @@ func (a *assetBlock) addAsset(newasset asset) {
 	a.count += 1
 	if newasset.IsNew {
 		a.newcount += 1
+	} else {
+		a.existedcount += 1
 	}
 	a.Unlock()
 }

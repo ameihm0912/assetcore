@@ -40,6 +40,7 @@ func rulesPipeline(hint assetHint) {
 		return
 	} else if len(related) > 1 {
 		// TODO: Right now this isn't handled, but it will need to be.
+		return
 	}
 
 	related[0].updateFromHint(&hint)
