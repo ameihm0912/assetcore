@@ -16,6 +16,7 @@ type assetBlock struct {
 	count        int
 	newcount     int
 	existedcount int
+	updatecount  int
 
 	// Search lock.
 	sync.Mutex
@@ -40,16 +41,25 @@ func (a *assetBlock) addAsset(newasset asset) {
 	a.Unlock()
 }
 
-func (a *assetBlock) searchRelatedAssets(hint *assetHint) (ret []*asset) {
+func (a *assetBlock) searchRelatedAssets(hint *assetHint) []*asset {
+	ret := make([]*asset, 0)
+
 	a.Lock()
-	for _, x := range a.assets {
+	// Iterate through assets and test relation to the hint. We don't use
+	// range here as we want to return pointers to the asset values
+	// for later modification.
+	for i := 0; i < len(a.assets); i++ {
+		x := &a.assets[i]
 		x.Lock()
-		ret, added := x.testIPv4Related(hint, ret)
+		added := false
+		ret, added = x.testIPv4Related(hint, ret)
 		if added {
+			x.Unlock()
 			continue
 		}
 		ret, added = x.testHostnameRelated(hint, ret)
 		if added {
+			x.Unlock()
 			continue
 		}
 		x.Unlock()
@@ -139,12 +149,21 @@ func (a *asset) updateFromHint(hint *assetHint) {
 	// See if the asset already has data integrated from a hint from
 	// the same provider that is newer; if so this older hint is just
 	// ignored.
-	if a.tagExpired(hint) {
-		corCntrs.Lock()
-		corCntrs.hints_ignored_tagts++
+	aBlock.Lock()
+	a.Lock()
+	corCntrs.Lock()
+	defer func() {
 		corCntrs.Unlock()
+		a.Unlock()
+		aBlock.Unlock()
+	}()
+
+	if a.tagExpired(hint) {
+		corCntrs.hints_ignored_tagts++
 		return
 	}
+
+	aBlock.updatecount += 1
 }
 
 func (a *asset) testIPv4Related(hint *assetHint, l []*asset) ([]*asset, bool) {

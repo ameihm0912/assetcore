@@ -305,6 +305,7 @@ func assetCorrelator() {
 	logmsg("correlation complete, %v assets in block", aBlock.count)
 	logmsg("%v assets existed before run", aBlock.existedcount)
 	logmsg("%v assets are new", aBlock.newcount)
+	logmsg("%v asset updates", aBlock.updatecount)
 	logmsg("%v hints ignored due to expired tag timestamps", corCntrs.hints_ignored_tagts)
 
 	logmsg("pushing updated asset data")
