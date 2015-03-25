@@ -87,7 +87,7 @@ func cache_init() error {
 	if err != nil {
 		return err
 	}
-	cs.assetsPost, err = os.OpenFile(cfg.cacheAssetsPostPath, fmode, 0644)
+	cs.assetsPost, err = os.OpenFile(cfg.cacheAssetsPostPath, fmode|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
