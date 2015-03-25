@@ -50,7 +50,7 @@ func cache_get_assets_pre() (ret []asset, err error) {
 	dec := json.NewDecoder(cs.assetsPre)
 	for {
 		var a asset
-		err := dec.Decode(&a)
+		err = dec.Decode(&a)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -67,7 +67,7 @@ func cache_get_hints() (ret []assetHint, err error) {
 	dec := json.NewDecoder(cs.hints)
 	for {
 		var a assetHint
-		err := dec.Decode(&a)
+		err = dec.Decode(&a)
 		if err != nil {
 			if err == io.EOF {
 				break
