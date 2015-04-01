@@ -7,8 +7,37 @@
 
 package main
 
+import (
+	idb "inteldb"
+)
+
 type acConfig struct {
+	logChan       chan string
+	hintsChan     chan idb.AssetHint
+	hintsChanDone chan bool
+
+	foreground bool
+
+	inteldbIndex string
+	inteldbHost  string
+	hintsIndex   string
+	hintsHost    string
+
+	maxDocuments    int
+	previousMinutes int
 }
 
-func (cfg *acConfig) setDefaults() {
+func (c *acConfig) setDefaults() {
+	c.foreground = false
+
+	c.inteldbIndex = "inteldb"
+	c.inteldbHost = "eshost"
+	c.hintsHost = "eshost"
+	c.hintsIndex = "events"
+
+	c.previousMinutes = 480
+	c.maxDocuments = 10000
+
+	c.hintsChan = make(chan idb.AssetHint)
+	c.hintsChanDone = make(chan bool)
 }

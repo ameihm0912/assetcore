@@ -19,4 +19,5 @@ clean:
 	rm -f bin/assetcore
 
 assetcore:
+	go build inteldb
 	go install assetcore
