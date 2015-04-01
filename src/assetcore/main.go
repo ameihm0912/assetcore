@@ -58,6 +58,26 @@ func main() {
 	logMessage("hints fetch will start at %v", startAt)
 	go hintsconn.HintsFetch(cfg.hintsChan, cfg.hintsChanDone, startAt)
 
+	doexit := false
+	for {
+		select {
+		case nh := <-cfg.hintsChan:
+			if nh.Err != nil {
+				logMessage("hints channel: %v", nh.Err)
+				doexit = true
+				break
+			} else if len(nh.Log) != 0 {
+				logMessage(nh.Log)
+				break
+			}
+			logMessage("%v", nh.Hint)
+		}
+
+		if doexit {
+			break
+		}
+	}
+
 	<-cfg.hintsChanDone
 	logMessage("hints fetch has returned")
 }

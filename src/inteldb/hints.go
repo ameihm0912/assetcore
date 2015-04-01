@@ -38,8 +38,9 @@ type AssetHintDetails struct {
 }
 
 type HintsMessage struct {
-	hint AssetHint
-	err  error
+	Hint AssetHint
+	Err  error
+	Log  string
 }
 
 type HintsConn struct {
@@ -78,10 +79,11 @@ func (h *HintsConn) HintsFetch(hintsChan chan HintsMessage, doneChan chan bool, 
 	// the current time.
 	now := time.Now().UTC()
 	qs := startAt
+	var qe time.Time
 	window := time.Hour
 	last := false
 	for {
-		qe := qs.Add(window)
+		qe = qs.Add(window)
 		if qe.After(now) {
 			qe = now
 			last = true
@@ -90,11 +92,11 @@ func (h *HintsConn) HintsFetch(hintsChan chan HintsMessage, doneChan chan bool, 
 		template := createHintsTemplate(qs, qe, maxDocuments)
 		res, err := h.Search(template)
 		if err != nil {
-			hintsChan <- HintsMessage{err: err}
+			hintsChan <- HintsMessage{Err: err}
 			return
 		}
 		for _, x := range res {
-			hintsChan <- HintsMessage{hint: x}
+			hintsChan <- HintsMessage{Hint: x}
 		}
 
 		if last {
@@ -102,6 +104,24 @@ func (h *HintsConn) HintsFetch(hintsChan chan HintsMessage, doneChan chan bool, 
 		}
 
 		qs = qe
+	}
+	hintsChan <- HintsMessage{Log: "completed hints prefetch"}
+
+	for {
+		now = time.Now().UTC()
+		we := now.Add(time.Minute)
+		time.Sleep(we.Sub(now))
+		hintsChan <- HintsMessage{Log: fmt.Sprintf("hints fetch %v -> %v", now, we)}
+
+		template := createHintsTemplate(now, we, maxDocuments)
+		res, err := h.Search(template)
+		if err != nil {
+			hintsChan <- HintsMessage{Err: err}
+			return
+		}
+		for _, x := range res {
+			hintsChan <- HintsMessage{Hint: x}
+		}
 	}
 }
 

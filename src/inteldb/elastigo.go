@@ -10,7 +10,6 @@ package inteldb
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	elastigo "github.com/mattbaird/elastigo/lib"
 )
 
@@ -28,7 +27,6 @@ func (i *idbES) init(host string) {
 func (i *idbES) search(template string, doctype string) (ret []json.RawMessage, err error) {
 	res, err := i.esConn.Search(i.esIndex, doctype, nil, template)
 	if err != nil {
-		fmt.Println("%v", err)
 		return ret, err
 	}
 	havehits := res.Hits.Len()
