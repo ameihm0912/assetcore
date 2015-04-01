@@ -17,7 +17,6 @@ cleanall:
 
 clean:
 	rm -f bin/assetcore
-	rm -f *.acc
 
 assetcore:
 	go install assetcore

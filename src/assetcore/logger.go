@@ -4,28 +4,5 @@
 //
 // Contributor:
 // - Aaron Meihm ameihm@mozilla.com
+
 package main
-
-import (
-	"fmt"
-	"time"
-)
-
-func logmsg(s string, args ...interface{}) {
-	buf := fmt.Sprintf(s, args...)
-	buf = "[" + time.Now().UTC().Format(time.RFC3339) + "] [assetcore] " + buf + "\n"
-	cfg.chlogger <- buf
-}
-
-func logger() {
-	defer func() {
-		cfg.chloggerexit <- true
-	}()
-	for {
-		s, status := <-cfg.chlogger
-		if !status {
-			return
-		}
-		fmt.Printf(s)
-	}
-}
