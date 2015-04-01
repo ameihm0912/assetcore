@@ -76,16 +76,17 @@ func (h *HintsConn) HintsFetch(hintsChan chan HintsMessage, doneChan chan bool, 
 	}()
 
 	// Start by fetching blocks of hints from the past in one hour intervals, until we reach
-	// the current time.
+	// the current time - 5 minutes.
 	now := time.Now().UTC()
+	endpoint := now.Add(-1 * (time.Minute * 5))
 	qs := startAt
 	var qe time.Time
 	window := time.Hour
 	last := false
 	for {
 		qe = qs.Add(window)
-		if qe.After(now) {
-			qe = now
+		if qe.After(endpoint) {
+			qe = endpoint
 			last = true
 		}
 
@@ -107,13 +108,20 @@ func (h *HintsConn) HintsFetch(hintsChan chan HintsMessage, doneChan chan bool, 
 	}
 	hintsChan <- HintsMessage{Log: "completed hints prefetch"}
 
+	// endpoint will be our start position, and we will always fetch one minute worth
+	// of data from this period, remaining approximately 4 - 5 minutes behind ES to
+	// ensure new data has been indexed before we try to read it.
+	startpoint := endpoint
 	for {
 		now = time.Now().UTC()
-		we := now.Add(time.Minute)
-		time.Sleep(we.Sub(now))
-		hintsChan <- HintsMessage{Log: fmt.Sprintf("hints fetch %v -> %v", now, we)}
+		we := now.Add(-1 * (time.Minute * 4))
+		time.Sleep(time.Minute)
+		qdiff := we.Sub(startpoint)
+		delaydelta := now.Sub(we)
+		hintsChan <- HintsMessage{Log: fmt.Sprintf("hints fetch %v -> %v", startpoint, we)}
+		hintsChan <- HintsMessage{Log: fmt.Sprintf("qdiff %v, delaydelta %v", qdiff, delaydelta)}
 
-		template := createHintsTemplate(now, we, maxDocuments)
+		template := createHintsTemplate(startpoint, we, maxDocuments)
 		res, err := h.Search(template)
 		if err != nil {
 			hintsChan <- HintsMessage{Err: err}
@@ -122,6 +130,8 @@ func (h *HintsConn) HintsFetch(hintsChan chan HintsMessage, doneChan chan bool, 
 		for _, x := range res {
 			hintsChan <- HintsMessage{Hint: x}
 		}
+
+		startpoint = we
 	}
 }
 
