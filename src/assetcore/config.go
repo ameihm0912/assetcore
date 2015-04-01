@@ -13,7 +13,7 @@ import (
 
 type acConfig struct {
 	logChan       chan string
-	hintsChan     chan idb.AssetHint
+	hintsChan     chan idb.HintsMessage
 	hintsChanDone chan bool
 
 	foreground bool
@@ -38,6 +38,6 @@ func (c *acConfig) setDefaults() {
 	c.previousMinutes = 480
 	c.maxDocuments = 10000
 
-	c.hintsChan = make(chan idb.AssetHint)
+	c.hintsChan = make(chan idb.HintsMessage)
 	c.hintsChanDone = make(chan bool)
 }

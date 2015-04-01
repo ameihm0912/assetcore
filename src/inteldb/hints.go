@@ -37,6 +37,11 @@ type AssetHintDetails struct {
 	HostnameMig string `json:"name"`
 }
 
+type HintsMessage struct {
+	hint AssetHint
+	err  error
+}
+
 type HintsConn struct {
 	idbConn idbES
 }
@@ -52,10 +57,19 @@ func (h *HintsConn) Init(host string, index string) (err error) {
 }
 
 func (h *HintsConn) Search(template string) (ret []AssetHint, err error) {
+	res, err := h.idbConn.search(template, "event")
+	if err != nil {
+		return ret, err
+	}
+	for _, x := range res {
+		var nh AssetHint
+		err = json.Unmarshal(x, &nh)
+		ret = append(ret, nh)
+	}
 	return ret, nil
 }
 
-func (h *HintsConn) HintsFetch(hintsChan chan AssetHint, doneChan chan bool, startAt time.Time) {
+func (h *HintsConn) HintsFetch(hintsChan chan HintsMessage, doneChan chan bool, startAt time.Time) {
 	defer func() {
 		doneChan <- true
 	}()
@@ -74,17 +88,13 @@ func (h *HintsConn) HintsFetch(hintsChan chan AssetHint, doneChan chan bool, sta
 		}
 
 		template := createHintsTemplate(qs, qe, maxDocuments)
-		res, err := h.idbConn.search(template, "event")
+		res, err := h.Search(template)
 		if err != nil {
+			hintsChan <- HintsMessage{err: err}
 			return
 		}
 		for _, x := range res {
-			var nh AssetHint
-			err = json.Unmarshal(x, &nh)
-			if err != nil {
-				return
-			}
-			hintsChan <- nh
+			hintsChan <- HintsMessage{hint: x}
 		}
 
 		if last {
