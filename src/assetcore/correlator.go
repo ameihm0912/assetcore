@@ -23,6 +23,11 @@ func corLoop() {
 			logMessage("corLoop: exit notification")
 			return
 		}
-		logMessage("%+v", nh)
+
+		nh.sanitize()
+		newnodes := nodesFromHint(&nh)
+		for x := range newnodes {
+			acns.updateNode(newnodes[x])
+		}
 	}
 }

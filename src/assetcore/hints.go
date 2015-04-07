@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	elastigo "github.com/mattbaird/elastigo/lib"
+	"strings"
 	"time"
 )
 
@@ -37,6 +38,22 @@ type AssetHintDetails struct {
 
 	// MIG compatibility
 	HostnameMig string `json:"name"`
+}
+
+func (h *AssetHint) sanitize() {
+	// If the IPv4 address has been stored in the hint with a subnet
+	// mask, strip that out. We could probably incorporate knowledge
+	// of the subnet mask into the asset.
+	for i, x := range h.Details.IPv4 {
+		r := strings.Index(x, "/")
+		if r != -1 {
+			h.Details.IPv4[i] = x[:r]
+		}
+	}
+
+	if len(h.Details.HostnameMig) != 0 {
+		h.Details.Hostname = h.Details.HostnameMig
+	}
 }
 
 func hintsLoop() {
