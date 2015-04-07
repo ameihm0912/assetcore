@@ -7,10 +7,6 @@
 
 package main
 
-import (
-//"time"
-)
-
 func corLoop() {
 	for {
 		select {
