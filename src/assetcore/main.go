@@ -9,75 +9,96 @@ package main
 
 import (
 	"flag"
-	idb "inteldb"
+	"sync"
 	"time"
 )
 
 var cfg acConfig
+var wgLogger sync.WaitGroup
+var wgMain sync.WaitGroup
 
-var idbconn idb.InteldbConn
-var hintsconn idb.HintsConn
+func failNotify() {
+	cfg.failNotifyChan <- true
+}
 
-func main() {
-	cfg.setDefaults()
+func fetchPreviousHints() {
+	now := time.Now().UTC()
+	upuntil := now.Add(-1 * (time.Minute * 5))
+	startFrom := upuntil.Add(-1 * (time.Minute * time.Duration(cfg.previousMinutes)))
+	windowSize := time.Minute * 30
 
-	flag.BoolVar(&cfg.foreground, "f", false, "run and log in foreground")
-	flag.IntVar(&cfg.previousMinutes, "p", 480, "begin hints fetch from now - minutes")
-	flag.IntVar(&cfg.maxDocuments, "s", 10000, "maximum documents to fetch per request")
-	flag.Parse()
-
-	doneChan := loggerNotification()
-	defer func() {
-		<-doneChan
-	}()
-	cfg.logChan = make(chan string)
-	go logger(cfg.logChan)
-	defer func() {
-		close(cfg.logChan)
-	}()
-
-	logMessage("assetcore initializing")
-
-	logMessage("initializing inteldb index")
-	err := idbconn.Init(cfg.inteldbHost, cfg.inteldbIndex)
-	if err != nil {
-		logMessage("initializing inteldb index: %v", err)
-		return
-	}
-
-	logMessage("initializing hints index")
-	err = hintsconn.Init(cfg.hintsHost, cfg.hintsIndex)
-	if err != nil {
-		logMessage("initializing hints index: %v", err)
-		return
-	}
-	idb.SetMaxDocuments(cfg.maxDocuments)
-
-	logMessage("spawning hints fetch goroutine")
-	startAt := time.Now().UTC().Add(-1 * (time.Duration(cfg.previousMinutes) * time.Minute))
-	logMessage("hints fetch will start at %v", startAt)
-	go hintsconn.HintsFetch(cfg.hintsChan, cfg.hintsChanDone, startAt)
-
-	doexit := false
+	curStart := startFrom
+	curEnd := curStart.Add(windowSize)
 	for {
 		select {
-		case nh := <-cfg.hintsChan:
-			if nh.Err != nil {
-				logMessage("hints channel: %v", nh.Err)
-				doexit = true
-				break
-			} else if len(nh.Log) != 0 {
-				logMessage(nh.Log)
-				break
-			}
-			logMessage("%v", nh.Hint)
+		case <-cfg.exitPreviousChan:
+			logMessage("fetchPreviousHints: exit notification")
+			return
+		default:
 		}
 
-		if doexit {
+		if curEnd.After(upuntil) {
+			curEnd = upuntil
+		}
+
+		err := fetchHints(curStart, curEnd, cfg.exitPreviousChan)
+		if err != nil {
+			logMessage("fetchPreviousHints: %v", err)
+			failNotify()
+			return
+		}
+
+		if curEnd == upuntil {
 			break
 		}
+
+		curStart = curEnd
+		curEnd = curEnd.Add(windowSize)
 	}
 
-	<-cfg.hintsChanDone
-	logMessage("hints fetch has returned")
+	logMessage("fetchPreviousHints: done")
+}
+
+func main() {
+	defer func() {
+		wgMain.Wait()
+		close(cfg.logChan)
+		wgLogger.Wait()
+	}()
+
+	cfg.setDefaults()
+
+	flag.BoolVar(&cfg.foreground, "f", false, "run in foreground")
+	flag.IntVar(&cfg.previousMinutes, "p", 480, "begin hints fetch from now - mins")
+	flag.IntVar(&cfg.maxDocuments, "s", 10000, "max documents to fetch per request")
+	flag.Parse()
+
+	wgLogger.Add(1)
+	go func() {
+		logger()
+		wgLogger.Done()
+	}()
+
+	wgMain.Add(1)
+	go func() {
+		fetchPreviousHints()
+		wgMain.Done()
+	}()
+
+	wgMain.Add(1)
+	go func() {
+		hintsLoop()
+		wgMain.Done()
+	}()
+
+	wgMain.Add(1)
+	go func() {
+		corLoop()
+		wgMain.Done()
+	}()
+
+	<-cfg.failNotifyChan
+	cfg.exitPreviousChan <- true
+	cfg.exitHintsChan <- true
+	cfg.exitCorChan <- true
 }

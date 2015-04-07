@@ -8,24 +8,25 @@
 package main
 
 import (
-	"fmt"
-	"time"
+//"time"
 )
 
-func logMessage(s string, args ...interface{}) {
-	buf := fmt.Sprintf(s, args...)
-	buf = "[" + time.Now().UTC().Format(time.RFC3339) + "] [assetcore] " + buf + "\n"
-	cfg.logChan <- buf
-}
-
-func logger() {
+func corLoop() {
 	for {
-		s, status := <-cfg.logChan
-		if !status {
+		select {
+		case <-cfg.exitCorChan:
+			logMessage("corLoop: exit notification")
+			return
+		default:
+		}
+
+		var nh AssetHint
+		select {
+		case nh = <-cfg.hintsChan:
+		case <-cfg.exitCorChan:
+			logMessage("corLoop: exit notification")
 			return
 		}
-		if cfg.foreground {
-			fmt.Printf(s)
-		}
+		logMessage("%+v", nh)
 	}
 }

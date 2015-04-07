@@ -7,37 +7,37 @@
 
 package main
 
-import (
-	idb "inteldb"
-)
-
 type acConfig struct {
-	logChan       chan string
-	hintsChan     chan idb.HintsMessage
-	hintsChanDone chan bool
+	logChan          chan string
+	hintsChan        chan AssetHint
+	failNotifyChan   chan bool
+	exitPreviousChan chan bool
+	exitHintsChan    chan bool
+	exitCorChan      chan bool
 
-	foreground bool
-
-	inteldbIndex string
-	inteldbHost  string
-	hintsIndex   string
-	hintsHost    string
-
+	foreground      bool
 	maxDocuments    int
 	previousMinutes int
+
+	hintsIndex string
+	hintsHost  string
 }
 
 func (c *acConfig) setDefaults() {
 	c.foreground = false
-
-	c.inteldbIndex = "inteldb"
-	c.inteldbHost = "eshost"
-	c.hintsHost = "eshost"
-	c.hintsIndex = "events"
-
-	c.previousMinutes = 480
 	c.maxDocuments = 10000
+	c.previousMinutes = 480
 
-	c.hintsChan = make(chan idb.HintsMessage)
-	c.hintsChanDone = make(chan bool)
+	c.hintsIndex = "events"
+	c.hintsHost = "eshost"
+
+	c.logChan = make(chan string)
+	c.hintsChan = make(chan AssetHint)
+	// failNotifyChan:
+	// Notification channel to collect goroutine failure indications; the
+	// buffer size should be large enough we never block a sender
+	c.failNotifyChan = make(chan bool, 10)
+	c.exitPreviousChan = make(chan bool, 1)
+	c.exitHintsChan = make(chan bool, 1)
+	c.exitCorChan = make(chan bool, 1)
 }
