@@ -25,7 +25,19 @@ func corLoop() {
 		}
 
 		nh.sanitize()
+
+		// Get a list of all nodes we could create from the asset hint.
+		// If the nodes do not already exist in the nodestore they
+		// will be added with the required relations. If they already
+		// exist updates will occur.
 		newnodes := nodesFromHint(&nh)
+		newnodes = relateNodeGroup(newnodes)
+
+		for _, x := range newnodes {
+			logMessage("%+v", x)
+			_ = acns.fetchNode(x)
+		}
+
 		for x := range newnodes {
 			acns.updateNode(newnodes[x])
 		}
